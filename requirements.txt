@@ -1,0 +1,28 @@
+# Core LangChain Libraries
+langchain==0.1.0
+langchain-core==0.1.10
+langchain-community==0.0.13
+langchain-text-splitters==0.0.1
+
+# AI Model Providers
+langchain-groq==0.0.1
+
+# Vector Database
+faiss-cpu==1.7.4
+
+# Embeddings & NLP
+sentence-transformers==2.2.2
+huggingface-hub==0.20.0
+transformers==4.36.0
+torch==2.1.0
+
+# Web Interface
+streamlit==1.30.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+requests==2.31.0
+
+# ML & Data Science
+numpy==1.26.0
