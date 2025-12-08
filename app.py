@@ -1,15 +1,17 @@
 import os
 import streamlit as st
-from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
 from langchain.vectorstores import FAISS
+from langchain.memory import ConversationBufferMemory
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.utilities import WikipediaAPIWrapper
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import Tool
 from langchain_groq import ChatGroq
 
-
-GROK_KEY = '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'
+# Get absolute path to data directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FAISS_INDEX_PATH = os.path.join(BASE_DIR, "data", "faiss_index")
 
 # Page configuration
 st.set_page_config(
@@ -23,11 +25,11 @@ st.markdown(
     "*Educational use only. Always consult a healthcare professional for medical advice.*"
 )
 
-# Sidebar for API key input (falls back to seckret_keys if provided)
+# Sidebar for API key input
 with st.sidebar:
     st.header("⚙️ Configuration")
     grok_api_key = st.text_input(
-        "Enter Groq API Key:", type="password", value=GROK_KEY or ""
+        "Enter Groq API Key:", type="password"
     )
     st.markdown("---")
     st.info("RAG + Wikipedia tool. Index at data/faiss_index.")
@@ -44,46 +46,43 @@ if "agent" not in st.session_state:
 @st.cache_resource
 def build_rag(api_key: str):
     vectorstore = FAISS.load_local(
-        "data/faiss_index",
+        FAISS_INDEX_PATH,
         embeddings=HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
-        ),
-        allow_dangerous_deserialization=True,
+        )
     )
     retriever = vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 3}
     )
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
     
-    # Simple retrieval chain without memory to avoid Pydantic compatibility issues
-    from langchain.chains import RetrievalQA
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        verbose=False
+    # Use simple memory without return_messages
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    qa = ConversationalRetrievalChain.from_llm(
+        llm, retriever=retriever, memory=memory, verbose=False
     )
     return qa, llm
 
 
 def build_agent(api_key: str):
-    qa_chain, llm = build_rag(api_key)
+    qa_chain, llm = build_rag()   # make sure you defined build_rag()
+
+    # Wikipedia tool
     wiki_tool = Tool(
         name="Wikipedia Search",
         func=WikipediaAPIWrapper().run,
-        description="Use this to look up medical info on Wikipedia",
+        description="Use this to look up medical info on Wikipedia"
     )
-    try:
-        agent = initialize_agent(
-            tools=[wiki_tool],
-            llm=llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=False,
-        )
-        return agent, qa_chain
-    except Exception:
-        # If agent fails, just return qa_chain
-        return None, qa_chain
+
+    # Agent setup
+    agent = initialize_agent(
+        tools=[wiki_tool],
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True
+    )
+
+    return agent, qa_chain
 
 
 # Initialize chains once API key is provided
@@ -110,8 +109,8 @@ if prompt and grok_api_key and st.session_state.qa_chain:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = st.session_state.qa_chain.invoke({"query": prompt})
-                answer = response.get("result", "") if isinstance(response, dict) else str(response)
+                response = st.session_state.qa_chain.invoke({"question": prompt})
+                answer = response.get("answer", "") if isinstance(response, dict) else str(response)
                 st.markdown(answer)
                 st.session_state.chat_history.append(
                     {"role": "assistant", "content": answer}
