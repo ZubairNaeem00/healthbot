@@ -1,6 +1,8 @@
 import streamlit as st
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -69,12 +71,28 @@ def load_rag_chain(api_key):
             model_kwargs={"device": "cpu"}
         )
         
-        # Load the FAISS vector store
-        vectorstore = FAISS.load_local(
-            "data/faiss_index", 
-            embeddings=embeddings, 
-            allow_dangerous_deserialization=True
-        )
+        def build_vectorstore():
+            loader = DirectoryLoader(
+                "Encyclopedias/",
+                glob="*.pdf",
+                loader_cls=PyPDFLoader,
+            )
+            documents = loader.load()
+            splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=100)
+            chunks = splitter.split_documents(documents)
+            store = FAISS.from_documents(chunks, embeddings)
+            store.save_local("data/faiss_index")
+            return store
+
+        # Load existing FAISS index, fallback to rebuilding if incompatible
+        try:
+            vectorstore = FAISS.load_local(
+                "data/faiss_index",
+                embeddings=embeddings,
+                allow_dangerous_deserialization=True,
+            )
+        except Exception:
+            vectorstore = build_vectorstore()
         
         # Create a retriever
         retriever = vectorstore.as_retriever(
