@@ -54,10 +54,12 @@ def build_rag(api_key: str):
     retriever = vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 3}
     )
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
+    
+    # Use simple memory without return_messages
+    memory = ConversationBufferMemory(memory_key="chat_history")
     qa = ConversationalRetrievalChain.from_llm(
-        llm, retriever=retriever, memory=memory
+        llm, retriever=retriever, memory=memory, verbose=False
     )
     return qa, llm
 
@@ -69,13 +71,17 @@ def build_agent(api_key: str):
         func=WikipediaAPIWrapper().run,
         description="Use this to look up medical info on Wikipedia",
     )
-    agent = initialize_agent(
-        tools=[wiki_tool],
-        llm=llm,
-        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=False,
-    )
-    return agent, qa_chain
+    try:
+        agent = initialize_agent(
+            tools=[wiki_tool],
+            llm=llm,
+            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=False,
+        )
+        return agent, qa_chain
+    except Exception:
+        # If agent fails, just return qa_chain
+        return None, qa_chain
 
 
 # Initialize chains once API key is provided
