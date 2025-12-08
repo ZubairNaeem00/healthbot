@@ -9,6 +9,9 @@ from langchain.agents import initialize_agent, AgentType
 from langchain.tools import Tool
 from langchain_groq import ChatGroq
 
+
+GROK_KEY = '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'
+
 # Page configuration
 st.set_page_config(
     page_title="Medical Information Chatbot",
