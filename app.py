@@ -57,19 +57,16 @@ def build_rag(api_key: str):
     )
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
     
-    # Create a simple retrieval chain without memory to avoid Pydantic issues
-    from langchain.chains import RetrievalQA
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        verbose=False
+    # Use simple memory without return_messages
+    memory = ConversationBufferMemory(memory_key="chat_history")
+    qa = ConversationalRetrievalChain.from_llm(
+        llm, retriever=retriever, memory=memory, verbose=False
     )
     return qa, llm
 
 
 def build_agent(api_key: str):
-    qa_chain, llm = build_rag(api_key)
+    qa_chain, llm = build_rag(api_key)   # make sure you defined build_rag()
 
     # Wikipedia tool
     wiki_tool = Tool(
@@ -79,17 +76,14 @@ def build_agent(api_key: str):
     )
 
     # Agent setup
-    try:
-        agent = initialize_agent(
-            tools=[wiki_tool],
-            llm=llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=False
-        )
-        return agent, qa_chain
-    except Exception as e:
-        st.warning(f"Agent failed to initialize: {e}. Using QA chain only.")
-        return None, qa_chain
+    agent = initialize_agent(
+        tools=[wiki_tool],
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=False
+    )
+
+    return agent, qa_chain
 
 
 # Initialize chains once API key is provided
@@ -116,8 +110,8 @@ if prompt and grok_api_key and st.session_state.qa_chain:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = st.session_state.qa_chain.invoke({"query": prompt})
-                answer = response.get("result", "") if isinstance(response, dict) else str(response)
+                response = st.session_state.qa_chain.invoke({"question": prompt})
+                answer = response.get("answer", "") if isinstance(response, dict) else str(response)
                 st.markdown(answer)
                 st.session_state.chat_history.append(
                     {"role": "assistant", "content": answer}
