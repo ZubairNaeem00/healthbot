@@ -1,201 +1,120 @@
-import streamlit as st
-from langchain.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 import os
+import streamlit as st
+from langchain_classic.chains import ConversationalRetrievalChain
+from langchain.vectorstores import FAISS
+from langchain_classic.memory import ConversationBufferMemory
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_classic.agents import initialize_agent, AgentType
+from langchain.tools import Tool
+from langchain_groq import ChatGroq
+from seckret_keys import GROK_KEY, OpenAI_Key
 
 # Page configuration
 st.set_page_config(
     page_title="Medical Information Chatbot",
     page_icon="🏥",
-    layout="wide"
+    layout="wide",
 )
 
-# Custom CSS for better UI
-st.markdown("""
-    <style>
-    .main {
-        padding: 2rem;
-    }
-    .stTextInput > div > div > input {
-        background-color: #f0f2f6;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Title and description
 st.title("🏥 Medical Information Chatbot")
-st.markdown("### RAG-powered AI Assistant for Medical Queries")
-st.markdown("*This is for educational purposes only. Always consult a healthcare professional for medical advice.*")
+st.markdown(
+    "*Educational use only. Always consult a healthcare professional for medical advice.*"
+)
 
-# Sidebar for API key input
+# Sidebar for API key input (falls back to seckret_keys if provided)
 with st.sidebar:
     st.header("⚙️ Configuration")
-    grok_api_key = st.text_input("Enter Groq API Key:", type="password", key="grok_key")
-    
-    st.markdown("---")
-    st.markdown("### 📝 About")
-    st.info(
-        "This chatbot uses Retrieval-Augmented Generation (RAG) "
-        "to provide accurate medical information from a curated knowledge base."
+    grok_api_key = st.text_input(
+        "Enter Groq API Key:", type="password", value=GROK_KEY or ""
     )
-    
-    st.markdown("### 🔍 Example Questions")
-    st.markdown("""
-    - What are the symptoms of diabetes?
-    - How to treat high blood pressure?
-    - What causes heart disease?
-    - Tell me about asthma symptoms
-    """)
-
-# Initialize session state for chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "rag_chain" not in st.session_state:
-    st.session_state.rag_chain = None
-
-# Function to load RAG chain
-@st.cache_resource
-def load_rag_chain(api_key):
-    """Initialize and load the RAG chain"""
-    try:
-        # Initialize embeddings model
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu"}
-        )
-        
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        pdf_dir = os.path.join(base_dir, "Encyclopedias")
-
-        def build_vectorstore():
-            if not os.path.isdir(pdf_dir):
-                raise FileNotFoundError(f"PDF directory not found: {pdf_dir}")
-            loader = DirectoryLoader(
-                pdf_dir,
-                glob="*.pdf",
-                loader_cls=PyPDFLoader,
-            )
-            documents = loader.load()
-            splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=100)
-            chunks = splitter.split_documents(documents)
-            store = FAISS.from_documents(chunks, embeddings)
-            store.save_local(os.path.join(base_dir, "data", "faiss_index"))
-            return store
-
-        # Load existing FAISS index, fallback to rebuilding if incompatible
-        try:
-            vectorstore = FAISS.load_local(
-                os.path.join(base_dir, "data", "faiss_index"),
-                embeddings=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            )
-        except Exception:
-            if os.path.isdir(pdf_dir):
-                vectorstore = build_vectorstore()
-            else:
-                raise FileNotFoundError(
-                    f"FAISS index could not be loaded and PDFs folder is missing: {pdf_dir}. "
-                    "Add your source PDFs there or commit a prebuilt index under data/faiss_index."
-                )
-        
-        # Create a retriever
-        retriever = vectorstore.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": 3}
-        )
-        
-        # Initialize the LLM
-        llm = ChatGroq(
-            model="llama-3.1-8b-instant",
-            temperature=0.3,
-            api_key=api_key
-        )
-        
-        # Create a prompt template
-        template = """You are a helpful medical information assistant. Use the following context from medical documents to answer the user's question accurately and comprehensively.
-
-If the answer is not in the context, say "I don't have enough information in my knowledge base to answer this question accurately. Please consult a healthcare professional."
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-        
-        prompt = ChatPromptTemplate.from_template(template)
-        
-        # Helper function to format retrieved documents
-        def format_docs(docs):
-            return "\n\n".join([doc.page_content for doc in docs])
-        
-        # Create the RAG chain
-        rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
-        
-        return rag_chain, True
-    except Exception as e:
-        return None, str(e)
-
-# Check if API key is provided
-if grok_api_key:
-    if st.session_state.rag_chain is None:
-        with st.spinner("Loading medical knowledge base..."):
-            rag_chain, status = load_rag_chain(grok_api_key)
-            if rag_chain:
-                st.session_state.rag_chain = rag_chain
-                st.success("✅ System ready!")
-            else:
-                st.error(f"❌ Error loading system: {status}")
-else:
-    st.warning("⚠️ Please enter your Groq API Key in the sidebar to start chatting.")
-
-# Display chat history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Chat input
-if prompt := st.chat_input("Ask your medical question here..."):
-    if not grok_api_key:
-        st.error("Please enter your Groq API Key in the sidebar first!")
-    elif st.session_state.rag_chain is None:
-        st.error("Please wait for the system to initialize!")
-    else:
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
-        # Get bot response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    response = st.session_state.rag_chain.invoke(prompt)
-                    st.markdown(response)
-                    
-                    # Add assistant response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                except Exception as e:
-                    error_msg = f"Error: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
-
-# Clear chat button in sidebar
-with st.sidebar:
     st.markdown("---")
+    st.info("RAG + Wikipedia tool. Index at data/faiss_index.")
+
+# Session state
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "qa_chain" not in st.session_state:
+    st.session_state.qa_chain = None
+if "agent" not in st.session_state:
+    st.session_state.agent = None
+
+
+@st.cache_resource
+def build_rag(api_key: str):
+    vectorstore = FAISS.load_local(
+        "data/faiss_index",
+        embeddings=HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        ),
+        allow_dangerous_deserialization=True,
+    )
+    retriever = vectorstore.as_retriever(
+        search_type="similarity", search_kwargs={"k": 3}
+    )
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
+    qa = ConversationalRetrievalChain.from_llm(
+        llm, retriever=retriever, memory=memory
+    )
+    return qa, llm
+
+
+def build_agent(api_key: str):
+    qa_chain, llm = build_rag(api_key)
+    wiki_tool = Tool(
+        name="Wikipedia Search",
+        func=WikipediaAPIWrapper().run,
+        description="Use this to look up medical info on Wikipedia",
+    )
+    agent = initialize_agent(
+        tools=[wiki_tool],
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=False,
+    )
+    return agent, qa_chain
+
+
+# Initialize chains once API key is provided
+if grok_api_key:
+    if st.session_state.qa_chain is None:
+        with st.spinner("Loading RAG index and tools..."):
+            try:
+                agent, qa_chain = build_agent(grok_api_key)
+                st.session_state.agent = agent
+                st.session_state.qa_chain = qa_chain
+                st.success("Ready!")
+            except Exception as e:
+                st.error(f"Failed to load: {e}")
+else:
+    st.warning("Enter your Groq API key to start.")
+
+
+# Chat UI
+prompt = st.chat_input("Ask your medical question...")
+if prompt and grok_api_key and st.session_state.qa_chain:
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                response = st.session_state.qa_chain.invoke({"question": prompt})
+                answer = response.get("answer", "") if isinstance(response, dict) else str(response)
+                st.markdown(answer)
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": answer}
+                )
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# Display prior chat
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+with st.sidebar:
     if st.button("🗑️ Clear Chat History"):
-        st.session_state.messages = []
+        st.session_state.chat_history = []
         st.rerun()
