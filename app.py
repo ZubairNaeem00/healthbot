@@ -65,7 +65,7 @@ def build_rag(api_key: str):
 
 
 def build_agent(api_key: str):
-    qa_chain, llm = build_rag()   # make sure you defined build_rag()
+    qa_chain, llm = build_rag(api_key)   # make sure you defined build_rag()
 
     # Wikipedia tool
     wiki_tool = Tool(
