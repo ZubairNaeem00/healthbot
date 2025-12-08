@@ -16,13 +16,12 @@ huggingface-hub==0.20.0
 transformers==4.36.0
 torch==2.1.0
 
-# Web Interface
-streamlit==1.30.0
-
 # Utilities
 python-dotenv==1.0.0
 pydantic==2.5.0
 requests==2.31.0
 
 # ML & Data Science
-numpy==1.26.0
+numpy==1.24.0
+
+streamlit==1.32.2
