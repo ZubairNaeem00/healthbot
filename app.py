@@ -97,7 +97,13 @@ def load_rag_chain(api_key):
                 allow_dangerous_deserialization=True,
             )
         except Exception:
-            vectorstore = build_vectorstore()
+            if os.path.isdir(pdf_dir):
+                vectorstore = build_vectorstore()
+            else:
+                raise FileNotFoundError(
+                    f"FAISS index could not be loaded and PDFs folder is missing: {pdf_dir}. "
+                    "Add your source PDFs there or commit a prebuilt index under data/faiss_index."
+                )
         
         # Create a retriever
         retriever = vectorstore.as_retriever(
