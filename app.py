@@ -1,11 +1,11 @@
 import os
 import streamlit as st
-from langchain_classic.chains import ConversationalRetrievalChain
+from langchain.chains import ConversationalRetrievalChain
 from langchain.vectorstores import FAISS
-from langchain_classic.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.utilities import WikipediaAPIWrapper
-from langchain_classic.agents import initialize_agent, AgentType
+from langchain.agents import initialize_agent, AgentType
 from langchain.tools import Tool
 from langchain_groq import ChatGroq
 from seckret_keys import GROK_KEY, OpenAI_Key
