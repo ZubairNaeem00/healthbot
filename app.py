@@ -49,7 +49,8 @@ def build_rag(api_key: str):
         FAISS_INDEX_PATH,
         embeddings=HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        ),
+        allow_dangerous_deserialization=True
     )
     retriever = vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 3}
@@ -57,7 +58,7 @@ def build_rag(api_key: str):
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
     
     # Use simple memory without return_messages
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    memory = ConversationBufferMemory(memory_key="chat_history")
     qa = ConversationalRetrievalChain.from_llm(
         llm, retriever=retriever, memory=memory, verbose=False
     )
@@ -79,7 +80,7 @@ def build_agent(api_key: str):
         tools=[wiki_tool],
         llm=llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True
+        verbose=False
     )
 
     return agent, qa_chain
