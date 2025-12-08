@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_community.vectorstores import FAISS
+from langchain.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -93,8 +93,7 @@ def load_rag_chain(api_key):
         try:
             vectorstore = FAISS.load_local(
                 os.path.join(base_dir, "data", "faiss_index"),
-                embeddings=embeddings,
-                allow_dangerous_deserialization=True,
+                embeddings=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
             )
         except Exception:
             if os.path.isdir(pdf_dir):
