@@ -8,7 +8,6 @@ from langchain_community.utilities import WikipediaAPIWrapper
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import Tool
 from langchain_groq import ChatGroq
-from seckret_keys import GROK_KEY, OpenAI_Key
 
 # Page configuration
 st.set_page_config(
