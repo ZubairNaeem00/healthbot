@@ -71,9 +71,14 @@ def load_rag_chain(api_key):
             model_kwargs={"device": "cpu"}
         )
         
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        pdf_dir = os.path.join(base_dir, "Encyclopedias")
+
         def build_vectorstore():
+            if not os.path.isdir(pdf_dir):
+                raise FileNotFoundError(f"PDF directory not found: {pdf_dir}")
             loader = DirectoryLoader(
-                "Encyclopedias/",
+                pdf_dir,
                 glob="*.pdf",
                 loader_cls=PyPDFLoader,
             )
@@ -81,13 +86,13 @@ def load_rag_chain(api_key):
             splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=100)
             chunks = splitter.split_documents(documents)
             store = FAISS.from_documents(chunks, embeddings)
-            store.save_local("data/faiss_index")
+            store.save_local(os.path.join(base_dir, "data", "faiss_index"))
             return store
 
         # Load existing FAISS index, fallback to rebuilding if incompatible
         try:
             vectorstore = FAISS.load_local(
-                "data/faiss_index",
+                os.path.join(base_dir, "data", "faiss_index"),
                 embeddings=embeddings,
                 allow_dangerous_deserialization=True,
             )
