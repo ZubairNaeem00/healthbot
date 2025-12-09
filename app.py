@@ -62,7 +62,7 @@ def build_rag(api_key: str):
     retriever = vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 3}
     )
-    llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
+    llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.5, api_key=api_key)
     
     # Use simple memory without return_messages
     memory = ConversationBufferMemory(
