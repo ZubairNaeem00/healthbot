@@ -65,7 +65,11 @@ def build_rag(api_key: str):
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1, api_key=api_key)
     
     # Use simple memory without return_messages
-    memory = ConversationBufferMemory(memory_key="chat_history")
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        return_messages=True,
+        output_key="answer"
+    )
     qa = ConversationalRetrievalChain.from_llm(
         llm, retriever=retriever, memory=memory, verbose=False
     )
