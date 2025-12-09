@@ -112,28 +112,25 @@ else:
     st.warning("Enter your Groq API key to start.")
 
 
-# Chat UI
-prompt = st.chat_input("Ask your medical question...")
-if prompt and grok_api_key and st.session_state.qa_chain:
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                response = st.session_state.qa_chain.invoke({"question": prompt})
-                answer = response.get("answer", "") if isinstance(response, dict) else str(response)
-                st.markdown(answer)
-                st.session_state.chat_history.append(
-                    {"role": "assistant", "content": answer}
-                )
-            except Exception as e:
-                st.error(f"Error: {e}")
-
 # Display prior chat
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
+# Chat UI
+prompt = st.chat_input("Ask your medical question...")
+if prompt and grok_api_key and st.session_state.qa_chain:
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+    st.session_state.chat_history.append({"role": "assistant", "content": "..."})  # placeholder
+    st.rerun()  # rerun to display immediately
+    
+    with st.spinner("Thinking..."):
+        try:
+            response = st.session_state.qa_chain.invoke({"question": prompt})
+            answer = response.get("answer", "") if isinstance(response, dict) else str(response)
+            st.session_state.chat_history[-1] = {"role": "assistant", "content": answer}
+        except Exception as e:
+            st.session_state.chat_history[-1] = {"role": "assistant", "content": f"Error: {e}"}
 
 with st.sidebar:
     if st.button("🗑️ Clear Chat History"):
