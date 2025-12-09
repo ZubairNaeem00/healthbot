@@ -80,15 +80,12 @@ def build_rag(api_key: str):
             embeddings=embeddings,
             allow_dangerous_deserialization=True
         )
-        # Check number of docs in vectorstore
-        if hasattr(vectorstore, 'index') and hasattr(vectorstore, 'docstore'):
-            num_docs = len(getattr(vectorstore, 'docstore', {}).get('docs', {}))
-        elif hasattr(vectorstore, 'docstore'):
-            num_docs = len(getattr(vectorstore.docstore, 'docs', {}))
-        else:
-            num_docs = 'unknown'
-        st.write(f"FAISS index loaded. Number of docs: {num_docs}")
-        if num_docs == 0 or num_docs == 'unknown':
+        # Correctly check number of docs in vectorstore
+        num_docs = None
+        if hasattr(vectorstore, 'docstore') and hasattr(vectorstore.docstore, 'docs'):
+            num_docs = len(vectorstore.docstore.docs)
+        st.write(f"FAISS index loaded. Number of docs: {num_docs if num_docs is not None else 'unknown'}")
+        if num_docs == 0 or num_docs is None:
             st.error("FAISS index loaded but contains no documents! Check your index files.")
     except Exception as e:
         st.error(f"Failed to load FAISS index: {e}")
