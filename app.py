@@ -43,8 +43,7 @@ with st.sidebar:
     st.info("RAG + Wikipedia tool. Index at data/faiss_index.")
 
 # Session state
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+st.session_state.chat_history = []
 if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
 if "agent" not in st.session_state:
