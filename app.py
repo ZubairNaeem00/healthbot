@@ -13,6 +13,25 @@ from langchain_groq import ChatGroq
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FAISS_INDEX_PATH = os.path.join(BASE_DIR, "data", "faiss_index")
 
+
+# Download FAISS index files from Hugging Face if missing
+import requests
+def download_file(url, dest_path):
+    if not os.path.exists(dest_path):
+        print(f"Downloading {url} to {dest_path}...")
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print("Download complete.")
+
+os.makedirs(FAISS_INDEX_PATH, exist_ok=True)
+faiss_url = "https://huggingface.co/datasets/zubiarnaeem00/encyclopedias/resolve/main/index.faiss"
+pkl_url = "https://huggingface.co/datasets/zubiarnaeem00/encyclopedias/resolve/main/index.pkl"
+download_file(faiss_url, os.path.join(FAISS_INDEX_PATH, "index.faiss"))
+download_file(pkl_url, os.path.join(FAISS_INDEX_PATH, "index.pkl"))
+
 # Cache embeddings to avoid repeated downloads
 @st.cache_resource
 def get_embeddings():
