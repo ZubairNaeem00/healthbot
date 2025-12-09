@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from langchain.chains import ConversationalRetrievalChain
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.utilities import WikipediaAPIWrapper
