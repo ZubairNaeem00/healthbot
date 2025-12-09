@@ -71,18 +71,32 @@ if "agent" not in st.session_state:
 
 
 @st.cache_resource
+
 def build_rag(api_key: str):
     embeddings = get_embeddings()
-    vectorstore = FAISS.load_local(
-        FAISS_INDEX_PATH,
-        embeddings=embeddings,
-        allow_dangerous_deserialization=True
-    )
+    try:
+        vectorstore = FAISS.load_local(
+            FAISS_INDEX_PATH,
+            embeddings=embeddings,
+            allow_dangerous_deserialization=True
+        )
+        # Check number of docs in vectorstore
+        if hasattr(vectorstore, 'index') and hasattr(vectorstore, 'docstore'):
+            num_docs = len(getattr(vectorstore, 'docstore', {}).get('docs', {}))
+        elif hasattr(vectorstore, 'docstore'):
+            num_docs = len(getattr(vectorstore.docstore, 'docs', {}))
+        else:
+            num_docs = 'unknown'
+        st.write(f"FAISS index loaded. Number of docs: {num_docs}")
+        if num_docs == 0 or num_docs == 'unknown':
+            st.error("FAISS index loaded but contains no documents! Check your index files.")
+    except Exception as e:
+        st.error(f"Failed to load FAISS index: {e}")
+        raise
     retriever = vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 3}
     )
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.5, api_key=api_key)
-    
     # Use simple memory without return_messages
     memory = ConversationBufferMemory(
         memory_key="chat_history",
