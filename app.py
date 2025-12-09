@@ -13,6 +13,14 @@ from langchain_groq import ChatGroq
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FAISS_INDEX_PATH = os.path.join(BASE_DIR, "data", "faiss_index")
 
+# Cache embeddings to avoid repeated downloads
+@st.cache_resource
+def get_embeddings():
+    return HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        cache_folder=os.path.join(BASE_DIR, ".cache")
+    )
+
 # Page configuration
 st.set_page_config(
     page_title="Medical Information Chatbot",
@@ -45,11 +53,10 @@ if "agent" not in st.session_state:
 
 @st.cache_resource
 def build_rag(api_key: str):
+    embeddings = get_embeddings()
     vectorstore = FAISS.load_local(
         FAISS_INDEX_PATH,
-        embeddings=HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        ),
+        embeddings=embeddings,
         allow_dangerous_deserialization=True
     )
     retriever = vectorstore.as_retriever(
